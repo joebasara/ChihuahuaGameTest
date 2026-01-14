@@ -35,7 +35,7 @@ healthImgs[1].src = "health2.png";
 healthImgs[2].src = "health3.png";
 
 // --- Physics ---
-const GRAVITY = 0.6;
+const GRAVITY = 1;
 const JUMP_FORCE = 16;
 const MOVE_ACCEL = 0.6;
 const AIR_ACCEL = 0.4;
