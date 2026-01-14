@@ -63,7 +63,7 @@ const player = {
   blinkTimer: 0,
   blinkCount: 0,
   isJumping: false,
-  isJumpingByUser: false // manual jump flag
+  isJumpingByUser: false
 };
 
 // --- Game state ---
@@ -199,7 +199,13 @@ function update() {
   const onGround = player.y >= groundY;
   player.isJumping = !onGround;
 
-  // Horizontal movement
+  // --- Horizontal movement ---
+
+  // PC keyboard
+  if (keys["ArrowRight"]) player.velocityX += onGround ? MOVE_ACCEL : AIR_ACCEL;
+  if (keys["ArrowLeft"]) player.velocityX -= onGround ? MOVE_ACCEL : AIR_ACCEL;
+
+  // Mobile swipe
   if (swipeActive) {
     if (swipeDir === 1) player.velocityX += onGround ? MOVE_ACCEL : AIR_ACCEL;
     else if (swipeDir === -1) player.velocityX -= onGround ? MOVE_ACCEL : AIR_ACCEL;
@@ -210,10 +216,6 @@ function update() {
   player.velocityX = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.velocityX));
   player.x += player.velocityX;
 
-  // Keyboard fallback
-  if (keys["ArrowRight"]) player.velocityX += onGround ? MOVE_ACCEL : AIR_ACCEL;
-  if (keys["ArrowLeft"]) player.velocityX -= onGround ? MOVE_ACCEL : AIR_ACCEL;
-
   // Gravity
   player.velocityY += GRAVITY;
   player.y += player.velocityY;
@@ -223,7 +225,7 @@ function update() {
     player.y = groundY;
     player.velocityY = 0;
     player.jumpsLeft = player.maxJumps;
-    player.isJumpingByUser = false; // reset jump image after landing
+    player.isJumpingByUser = false;
   }
 
   // Clamp horizontal
@@ -351,7 +353,7 @@ function draw() {
   const blink = player.invincible && player.blinkCount % 2 === 0;
 
   if (player.isJumpingByUser) {
-    const scale = 1.2; // 20% bigger
+    const scale = 1.4; // 40% bigger
     const ratio = characterJump.width / characterJump.height || 1;
     const drawHeight = player.height * scale;
     const drawWidth = drawHeight * ratio;
