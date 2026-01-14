@@ -28,8 +28,8 @@ healthImgs[1].src = "health2.png";
 healthImgs[2].src = "health3.png";
 
 // --- Physics ---
-const GRAVITY = 1;
-const JUMP_FORCE = 20;
+const GRAVITY = 0.6;
+const JUMP_FORCE = 16;
 const MOVE_ACCEL = 0.6;
 const AIR_ACCEL = 0.4;
 const MAX_SPEED = 7;
@@ -72,9 +72,59 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("keyup", e => keys[e.key] = false);
 
+// Mobile restart
 canvas.addEventListener("touchstart", () => {
   if (gameOver) resetGame();
 });
+
+// --- Mobile touch controls ---
+let touchStartX = 0;
+let lastTapTime = 0;
+
+canvas.addEventListener("touchstart", e => {
+  e.preventDefault();
+  const touch = e.changedTouches[0];
+  const x = touch.clientX;
+
+  // LEFT half = movement
+  if (x < canvas.width / 2) {
+    touchStartX = x;
+  } 
+  // RIGHT half = jump
+  else {
+    const now = Date.now();
+    if (now - lastTapTime < 300) {
+      keys[" "] = true; // double jump
+    } else {
+      keys[" "] = true; // single jump
+    }
+    lastTapTime = now;
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchmove", e => {
+  e.preventDefault();
+  const touch = e.changedTouches[0];
+  const x = touch.clientX;
+
+  if (x < canvas.width / 2) {
+    const dx = x - touchStartX;
+    if (dx > 10) {
+      keys["ArrowRight"] = true;
+      keys["ArrowLeft"] = false;
+    } else if (dx < -10) {
+      keys["ArrowLeft"] = true;
+      keys["ArrowRight"] = false;
+    }
+  }
+}, { passive: false });
+
+canvas.addEventListener("touchend", e => {
+  e.preventDefault();
+  keys["ArrowLeft"] = false;
+  keys["ArrowRight"] = false;
+  keys[" "] = false;
+}, { passive: false });
 
 // --- Background scale ---
 background.onload = () => {
@@ -134,7 +184,6 @@ function update() {
   if (!player.alive) {
     player.velocityY += GRAVITY;
     player.y += player.velocityY;
-
     if (player.y > canvas.height + 200) {
       gameOver = true;
     }
@@ -176,7 +225,7 @@ function update() {
   cameraX = player.x + player.width / 2 - canvas.width / 2;
   cameraX = Math.max(0, Math.min(cameraX, bgScaledWidth - canvas.width));
 
-  // Spawn durians (SIDE + DROP)
+  // Spawn durians (ground + top drop)
   spawnTimer++;
   if (spawnTimer >= SPAWN_INTERVAL && durians.length < MAX_DURIANS) {
     const fromTop = Math.random() < 0.45;
@@ -213,7 +262,6 @@ function update() {
     } else {
       d.vy += GRAVITY;
       d.y += d.vy;
-
       // Bounce once
       if (!d.bounced && d.y + d.size >= groundY + player.height) {
         d.y = groundY + player.height - d.size;
@@ -293,14 +341,9 @@ function draw() {
     player.height
   );
 
-  // Health
+  // Health bar (stretched)
   if (player.health > 0) {
-    ctx.drawImage(healthImgs[player.health - 1],
-  20,
-  20,
-  300, // wider (was 220)
-  80   // slightly taller to prevent squeezing
-);
+    ctx.drawImage(healthImgs[player.health - 1], 20, 20, 300, 80);
   }
 
   // Game Over
