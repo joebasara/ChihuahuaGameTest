@@ -28,8 +28,8 @@ healthImgs[1].src = "health2.png";
 healthImgs[2].src = "health3.png";
 
 // --- Physics ---
-const GRAVITY = 1;
-const JUMP_FORCE = 18;
+const GRAVITY = 0.6;
+const JUMP_FORCE = 16;
 const MOVE_ACCEL = 0.6;
 const AIR_ACCEL = 0.4;
 const MAX_SPEED = 7;
@@ -72,8 +72,12 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("keyup", e => keys[e.key] = false);
 
-// --- Full-screen mobile touch controls ---
+// --- Full-screen mobile swipe-to-move + tap-to-jump ---
 const ongoingTouches = {};
+let swipeActive = false;
+let swipeDir = 0; // -1 left, 1 right
+let tapStart = null;
+
 function getTouchPos(touch) {
   const rect = canvas.getBoundingClientRect();
   return {
@@ -93,24 +97,24 @@ canvas.addEventListener("touchstart", e => {
       return;
     }
 
-    // Tap anywhere to jump
-    keys[" "] = true;
+    tapStart = pos; // start position for tap detection
+    swipeActive = true;
+    swipeDir = 0;
   }
 }, { passive: false });
 
 canvas.addEventListener("touchmove", e => {
   e.preventDefault();
-  keys["ArrowLeft"] = false;
-  keys["ArrowRight"] = false;
-
   for (let touch of e.touches) {
     const prev = ongoingTouches[touch.identifier];
     const pos = getTouchPos(touch);
     if (!prev) continue;
 
     const dx = pos.x - prev.x;
-    if (dx > 10) keys["ArrowRight"] = true;
-    else if (dx < -10) keys["ArrowLeft"] = true;
+
+    if (Math.abs(dx) > 10) {
+      swipeDir = dx > 0 ? 1 : -1; // detect swipe direction
+    }
 
     ongoingTouches[touch.identifier] = pos;
   }
@@ -119,11 +123,24 @@ canvas.addEventListener("touchmove", e => {
 canvas.addEventListener("touchend", e => {
   e.preventDefault();
   for (let touch of e.changedTouches) {
+    const start = tapStart;
+    const end = getTouchPos(touch);
     delete ongoingTouches[touch.identifier];
+
+    // Tap detection: small movement
+    if (start && Math.abs(end.x - start.x) < 10 && Math.abs(end.y - start.y) < 10) {
+      if (player.jumpsLeft > 0) {
+        player.velocityY = -JUMP_FORCE;
+        player.jumpsLeft--;
+      }
+    }
   }
-  keys["ArrowLeft"] = false;
-  keys["ArrowRight"] = false;
-  keys[" "] = false;
+
+  // Stop movement if no fingers remain
+  if (Object.keys(ongoingTouches).length === 0) {
+    swipeActive = false;
+    swipeDir = 0;
+  }
 });
 
 // --- Background scale ---
@@ -189,34 +206,40 @@ function update() {
 
   const onGround = player.y >= groundY;
 
-  if (keys["ArrowRight"]) player.velocityX += onGround ? MOVE_ACCEL : AIR_ACCEL;
-  if (keys["ArrowLeft"]) player.velocityX -= onGround ? MOVE_ACCEL : AIR_ACCEL;
-  if (!keys["ArrowLeft"] && !keys["ArrowRight"] && onGround) player.velocityX *= FRICTION;
+  // --- Horizontal movement ---
+  if (swipeActive) {
+    if (swipeDir === 1) player.velocityX += onGround ? MOVE_ACCEL : AIR_ACCEL;
+    else if (swipeDir === -1) player.velocityX -= onGround ? MOVE_ACCEL : AIR_ACCEL;
+  } else if (!keys["ArrowLeft"] && !keys["ArrowRight"]) {
+    if (onGround) player.velocityX *= FRICTION;
+  }
 
   player.velocityX = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.velocityX));
   player.x += player.velocityX;
 
-  if (keys[" "] && player.jumpsLeft > 0) {
-    player.velocityY = -JUMP_FORCE;
-    player.jumpsLeft--;
-    keys[" "] = false;
-  }
+  // --- Keyboard fallback ---
+  if (keys["ArrowRight"]) player.velocityX += onGround ? MOVE_ACCEL : AIR_ACCEL;
+  if (keys["ArrowLeft"]) player.velocityX -= onGround ? MOVE_ACCEL : AIR_ACCEL;
 
+  // --- Gravity ---
   player.velocityY += GRAVITY;
   player.y += player.velocityY;
 
+  // --- Ground collision ---
   if (player.y >= groundY) {
     player.y = groundY;
     player.velocityY = 0;
     player.jumpsLeft = player.maxJumps;
   }
 
+  // --- Clamp horizontal ---
   player.x = Math.max(0, Math.min(player.x, bgScaledWidth - player.width));
 
+  // --- Camera follow ---
   cameraX = player.x + player.width / 2 - canvas.width / 2;
   cameraX = Math.max(0, Math.min(cameraX, bgScaledWidth - canvas.width));
 
-  // Spawn durians
+  // --- Spawn durians ---
   spawnTimer++;
   if (spawnTimer >= SPAWN_INTERVAL && durians.length < MAX_DURIANS) {
     const fromTop = Math.random() < 0.45;
@@ -225,7 +248,7 @@ function update() {
         x: cameraX + Math.random() * canvas.width,
         y: -DURIAN_SIZE,
         size: DURIAN_SIZE,
-        vy: rand(DROP_SPEED[0], DROP_SPEED[1]) * 0.5, // <-- half speed
+        vy: rand(DROP_SPEED[0], DROP_SPEED[1]) * 0.5, // slower fall
         bounced: false,
         type: "drop"
       });
@@ -242,13 +265,13 @@ function update() {
     spawnTimer = 0;
   }
 
-  // Update durians
+  // --- Update durians ---
   for (let i = durians.length - 1; i >= 0; i--) {
     const d = durians[i];
     if (d.type === "ground") {
       d.x += d.vx;
     } else {
-      d.vy += GRAVITY * 0.5; // <-- reduced gravity for slower fall
+      d.vy += GRAVITY * 0.5; // slower gravity
       d.y += d.vy;
       if (!d.bounced && d.y + d.size >= groundY + player.height) {
         d.y = groundY + player.height - d.size;
@@ -257,6 +280,7 @@ function update() {
       }
     }
 
+    // --- Collision with player ---
     if (!player.invincible && collide(player, d)) {
       player.health--;
       player.invincible = true;
@@ -325,4 +349,3 @@ function loop() {
 }
 
 loop();
-
