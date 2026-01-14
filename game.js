@@ -63,7 +63,7 @@ const player = {
   blinkTimer: 0,
   blinkCount: 0,
   isJumping: false,
-  isJumpingByUser: false // <-- track manual jump
+  isJumpingByUser: false // manual jump flag
 };
 
 // --- Game state ---
@@ -77,21 +77,18 @@ let groundY;
 const keys = {};
 document.addEventListener("keydown", e => {
   if (gameOver) resetGame();
-
   keys[e.key] = true;
 
-  // SPACEBAR jump
-  if (e.key === " ") {
-    if (player.jumpsLeft > 0 && player.alive) {
-      player.velocityY = -JUMP_FORCE;
-      player.jumpsLeft--;
-      player.isJumpingByUser = true; // mark manual jump
-    }
+  // Spacebar jump
+  if (e.key === " " && player.jumpsLeft > 0 && player.alive) {
+    player.velocityY = -JUMP_FORCE;
+    player.jumpsLeft--;
+    player.isJumpingByUser = true;
   }
 });
 document.addEventListener("keyup", e => keys[e.key] = false);
 
-// --- Mobile swipe-to-move + tap-to-jump ---
+// --- Mobile swipe + tap ---
 const ongoingTouches = {};
 let swipeActive = false;
 let swipeDir = 0;
@@ -111,10 +108,7 @@ canvas.addEventListener("touchstart", e => {
     const pos = getTouchPos(touch);
     ongoingTouches[touch.identifier] = pos;
 
-    if (gameOver) {
-      resetGame();
-      return;
-    }
+    if (gameOver) { resetGame(); return; }
 
     tapStart = pos;
     swipeActive = true;
@@ -130,10 +124,7 @@ canvas.addEventListener("touchmove", e => {
     if (!prev) continue;
 
     const dx = pos.x - prev.x;
-
-    if (Math.abs(dx) > 10) {
-      swipeDir = dx > 0 ? 1 : -1;
-    }
+    if (Math.abs(dx) > 10) swipeDir = dx > 0 ? 1 : -1;
 
     ongoingTouches[touch.identifier] = pos;
   }
@@ -150,7 +141,7 @@ canvas.addEventListener("touchend", e => {
       if (player.jumpsLeft > 0 && player.alive) {
         player.velocityY = -JUMP_FORCE;
         player.jumpsLeft--;
-        player.isJumpingByUser = true; // mark manual jump
+        player.isJumpingByUser = true;
       }
     }
   }
@@ -179,37 +170,18 @@ const GROUND_SPEED = [5, 7];
 const BALL_SPEED = [4, 7];
 let ballSpawnIndex = 0;
 
-// --- Helper functions ---
 function rand(min, max) { return Math.random() * (max - min) + min; }
-function collide(a, b) {
-  return (
-    a.x < b.x + b.size &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.size &&
-    a.y + a.height > b.y
-  );
-}
+function collide(a, b) { return a.x < b.x + b.size && a.x + a.width > b.x && a.y < b.y + b.size && a.y + a.height > b.y; }
 
 // --- Reset ---
 function resetGame() {
-  player.x = 50;
-  player.y = 200;
-  player.velocityX = 0;
-  player.velocityY = 0;
-  player.health = 3;
-  player.alive = true;
-  player.invincible = false;
-  player.blinkTimer = 0;
-  player.blinkCount = 0;
-  player.jumpsLeft = player.maxJumps;
-  player.isJumping = false;
-  player.isJumpingByUser = false;
-
-  durians.length = 0;
-  BALLS.length = 0;
-  spawnTimer = 0;
-  cameraX = 0;
-  gameOver = false;
+  player.x = 50; player.y = 200;
+  player.velocityX = 0; player.velocityY = 0;
+  player.health = 3; player.alive = true;
+  player.invincible = false; player.blinkTimer = 0; player.blinkCount = 0;
+  player.jumpsLeft = player.maxJumps; player.isJumping = false; player.isJumpingByUser = false;
+  durians.length = 0; BALLS.length = 0;
+  spawnTimer = 0; cameraX = 0; gameOver = false;
 }
 
 // --- Update ---
@@ -227,7 +199,7 @@ function update() {
   const onGround = player.y >= groundY;
   player.isJumping = !onGround;
 
-  // --- Horizontal movement ---
+  // Horizontal movement
   if (swipeActive) {
     if (swipeDir === 1) player.velocityX += onGround ? MOVE_ACCEL : AIR_ACCEL;
     else if (swipeDir === -1) player.velocityX -= onGround ? MOVE_ACCEL : AIR_ACCEL;
@@ -238,6 +210,10 @@ function update() {
   player.velocityX = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.velocityX));
   player.x += player.velocityX;
 
+  // Keyboard fallback
+  if (keys["ArrowRight"]) player.velocityX += onGround ? MOVE_ACCEL : AIR_ACCEL;
+  if (keys["ArrowLeft"]) player.velocityX -= onGround ? MOVE_ACCEL : AIR_ACCEL;
+
   // Gravity
   player.velocityY += GRAVITY;
   player.y += player.velocityY;
@@ -247,7 +223,7 @@ function update() {
     player.y = groundY;
     player.velocityY = 0;
     player.jumpsLeft = player.maxJumps;
-    player.isJumpingByUser = false; // reset after landing
+    player.isJumpingByUser = false; // reset jump image after landing
   }
 
   // Clamp horizontal
@@ -257,7 +233,7 @@ function update() {
   cameraX = player.x + player.width / 2 - canvas.width / 2;
   cameraX = Math.max(0, Math.min(cameraX, bgScaledWidth - canvas.width));
 
-  // --- Spawn durians and balls ---
+  // Spawn durians and balls
   spawnTimer++;
   if (spawnTimer >= SPAWN_INTERVAL) {
     if (durians.length < MAX_DURIANS) {
@@ -284,11 +260,10 @@ function update() {
       });
       ballSpawnIndex = 1 - ballSpawnIndex;
     }
-
     spawnTimer = 0;
   }
 
-  // --- Update durians ---
+  // Update durians
   for (let i = durians.length - 1; i >= 0; i--) {
     const d = durians[i];
     d.x += d.vx;
@@ -313,7 +288,7 @@ function update() {
     if (d.x < cameraX - 400 || d.x > cameraX + canvas.width + 400) durians.splice(i, 1);
   }
 
-  // --- Update balls ---
+  // Update balls
   for (let i = BALLS.length - 1; i >= 0; i--) {
     const b = BALLS[i];
     b.vy += GRAVITY;
@@ -374,16 +349,15 @@ function draw() {
 
   // Player
   const blink = player.invincible && player.blinkCount % 2 === 0;
-  let playerSprite = character;
 
   if (player.isJumpingByUser) {
-    // draw jump image in natural size
+    const scale = 1.2; // 20% bigger
     const ratio = characterJump.width / characterJump.height || 1;
-    const drawHeight = player.height;
+    const drawHeight = player.height * scale;
     const drawWidth = drawHeight * ratio;
     ctx.drawImage(characterJump, player.x - cameraX, player.y, drawWidth, drawHeight);
   } else {
-    playerSprite = blink ? characterSilhouette : character;
+    const playerSprite = blink ? characterSilhouette : character;
     ctx.drawImage(playerSprite, player.x - cameraX, player.y, player.width, player.height);
   }
 
