@@ -72,58 +72,76 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("keyup", e => keys[e.key] = false);
 
-// Mobile restart
-canvas.addEventListener("touchstart", () => {
-  if (gameOver) resetGame();
-});
-
 // --- Mobile touch controls ---
-let touchStartX = 0;
-let lastTapTime = 0;
-
+const ongoingTouches = {};
 canvas.addEventListener("touchstart", e => {
   e.preventDefault();
-  const touch = e.changedTouches[0];
-  const x = touch.clientX;
+  for (let touch of e.changedTouches) {
+    ongoingTouches[touch.identifier] = { x: touch.clientX, y: touch.clientY };
 
-  // LEFT half = movement
-  if (x < canvas.width / 2) {
-    touchStartX = x;
-  } 
-  // RIGHT half = jump
-  else {
-    const now = Date.now();
-    if (now - lastTapTime < 300) {
-      keys[" "] = true; // double jump
-    } else {
-      keys[" "] = true; // single jump
+    // Restart if game over
+    if (gameOver) {
+      resetGame();
+      return;
     }
-    lastTapTime = now;
+
+    if (touch.clientX < canvas.width / 2) {
+      // Left side: movement
+      if (touch.clientX < canvas.width / 4) {
+        keys["ArrowLeft"] = true;
+      } else {
+        keys["ArrowRight"] = true;
+      }
+    } else {
+      // Right side: jump
+      keys[" "] = true;
+    }
   }
 }, { passive: false });
 
 canvas.addEventListener("touchmove", e => {
   e.preventDefault();
-  const touch = e.changedTouches[0];
-  const x = touch.clientX;
+  for (let touch of e.changedTouches) {
+    const prev = ongoingTouches[touch.identifier];
+    if (!prev) continue;
+    const dx = touch.clientX - prev.x;
 
-  if (x < canvas.width / 2) {
-    const dx = x - touchStartX;
-    if (dx > 10) {
-      keys["ArrowRight"] = true;
-      keys["ArrowLeft"] = false;
-    } else if (dx < -10) {
-      keys["ArrowLeft"] = true;
-      keys["ArrowRight"] = false;
+    // Left side swipe: movement
+    if (touch.clientX < canvas.width / 2) {
+      if (dx > 10) {
+        keys["ArrowRight"] = true;
+        keys["ArrowLeft"] = false;
+      } else if (dx < -10) {
+        keys["ArrowLeft"] = true;
+        keys["ArrowRight"] = false;
+      }
     }
+
+    ongoingTouches[touch.identifier] = { x: touch.clientX, y: touch.clientY };
   }
 }, { passive: false });
 
 canvas.addEventListener("touchend", e => {
   e.preventDefault();
-  keys["ArrowLeft"] = false;
-  keys["ArrowRight"] = false;
-  keys[" "] = false;
+  for (let touch of e.changedTouches) {
+    delete ongoingTouches[touch.identifier];
+
+    // Stop movement if no more left-side touches
+    let leftTouchExists = false;
+    for (let t in ongoingTouches) {
+      if (ongoingTouches[t].x < canvas.width / 2) {
+        leftTouchExists = true;
+        break;
+      }
+    }
+    if (!leftTouchExists) {
+      keys["ArrowLeft"] = false;
+      keys["ArrowRight"] = false;
+    }
+
+    // Stop jump when touch ends
+    keys[" "] = false;
+  }
 }, { passive: false });
 
 // --- Background scale ---
@@ -225,7 +243,7 @@ function update() {
   cameraX = player.x + player.width / 2 - canvas.width / 2;
   cameraX = Math.max(0, Math.min(cameraX, bgScaledWidth - canvas.width));
 
-  // Spawn durians (ground + top drop)
+  // Spawn durians
   spawnTimer++;
   if (spawnTimer >= SPAWN_INTERVAL && durians.length < MAX_DURIANS) {
     const fromTop = Math.random() < 0.45;
@@ -341,7 +359,7 @@ function draw() {
     player.height
   );
 
-  // Health bar (stretched)
+  // Health bar
   if (player.health > 0) {
     ctx.drawImage(healthImgs[player.health - 1], 20, 20, 300, 80);
   }
