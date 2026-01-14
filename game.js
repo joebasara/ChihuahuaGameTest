@@ -28,8 +28,8 @@ healthImgs[1].src = "health2.png";
 healthImgs[2].src = "health3.png";
 
 // --- Physics ---
-const GRAVITY = 0.6;
-const JUMP_FORCE = 16;
+const GRAVITY = 1;
+const JUMP_FORCE = 18;
 const MOVE_ACCEL = 0.6;
 const AIR_ACCEL = 0.4;
 const MAX_SPEED = 7;
@@ -325,3 +325,4 @@ function loop() {
 }
 
 loop();
+
