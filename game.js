@@ -357,7 +357,9 @@ function draw() {
     const ratio = characterJump.width / characterJump.height || 1;
     const drawHeight = player.height * scale;
     const drawWidth = drawHeight * ratio;
-    ctx.drawImage(characterJump, player.x - cameraX, player.y, drawWidth, drawHeight);
+    const drawX = player.x - cameraX;
+    const drawY = player.y - (drawHeight - player.height); // align bottom
+    ctx.drawImage(characterJump, drawX, drawY, drawWidth, drawHeight);
   } else {
     const playerSprite = blink ? characterSilhouette : character;
     ctx.drawImage(playerSprite, player.x - cameraX, player.y, player.width, player.height);
