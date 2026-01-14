@@ -19,6 +19,9 @@ character.src = "character.png";
 const characterJump = new Image();
 characterJump.src = "character_jump.png";
 
+const characterJumpSilhouette = new Image();
+characterJumpSilhouette.src = "character_jump_silhouette.png";
+
 const characterSilhouette = new Image();
 characterSilhouette.src = "character_silhouette.png";
 
@@ -353,13 +356,18 @@ function draw() {
   const blink = player.invincible && player.blinkCount % 2 === 0;
 
   if (player.isJumpingByUser) {
-    const scale = 1.8; // 80% bigger
+    const scale = 2.2; // 120% bigger
     const ratio = characterJump.width / characterJump.height || 1;
     const drawHeight = player.height * scale;
     const drawWidth = drawHeight * ratio;
     const drawX = player.x - cameraX;
     const drawY = player.y - (drawHeight - player.height); // align bottom
-    ctx.drawImage(characterJump, drawX, drawY, drawWidth, drawHeight);
+
+    if (blink) {
+      ctx.drawImage(characterJumpSilhouette, drawX, drawY, drawWidth, drawHeight);
+    } else {
+      ctx.drawImage(characterJump, drawX, drawY, drawWidth, drawHeight);
+    }
   } else {
     const playerSprite = blink ? characterSilhouette : character;
     ctx.drawImage(playerSprite, player.x - cameraX, player.y, player.width, player.height);
@@ -388,4 +396,3 @@ function loop() {
 }
 
 loop();
-
