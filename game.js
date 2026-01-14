@@ -356,7 +356,7 @@ function draw() {
   const blink = player.invincible && player.blinkCount % 2 === 0;
 
   if (player.isJumpingByUser) {
-    const scale = 1.7; // 70% bigger
+    const scale = 1.8; // 80% bigger
     const ratio = characterJump.width / characterJump.height || 1;
     const drawHeight = player.height * scale;
     const drawWidth = drawHeight * ratio;
@@ -396,6 +396,7 @@ function loop() {
 }
 
 loop();
+
 
 
 
