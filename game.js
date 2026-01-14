@@ -62,7 +62,8 @@ const player = {
   invincible: false,
   blinkTimer: 0,
   blinkCount: 0,
-  isJumping: false
+  isJumping: false,
+  isJumpingByUser: false // <-- track manual jump
 };
 
 // --- Game state ---
@@ -76,7 +77,17 @@ let groundY;
 const keys = {};
 document.addEventListener("keydown", e => {
   if (gameOver) resetGame();
+
   keys[e.key] = true;
+
+  // SPACEBAR jump
+  if (e.key === " ") {
+    if (player.jumpsLeft > 0 && player.alive) {
+      player.velocityY = -JUMP_FORCE;
+      player.jumpsLeft--;
+      player.isJumpingByUser = true; // mark manual jump
+    }
+  }
 });
 document.addEventListener("keyup", e => keys[e.key] = false);
 
@@ -136,9 +147,10 @@ canvas.addEventListener("touchend", e => {
     delete ongoingTouches[touch.identifier];
 
     if (start && Math.abs(end.x - start.x) < 10 && Math.abs(end.y - start.y) < 10) {
-      if (player.jumpsLeft > 0) {
+      if (player.jumpsLeft > 0 && player.alive) {
         player.velocityY = -JUMP_FORCE;
         player.jumpsLeft--;
+        player.isJumpingByUser = true; // mark manual jump
       }
     }
   }
@@ -158,20 +170,17 @@ background.onload = () => {
 // --- Durians & Balls ---
 const durians = [];
 const BALLS = [];
-const SPAWN_INTERVAL = 160; // fewer durians
+const SPAWN_INTERVAL = 160;
 const MAX_DURIANS = 2;
 const MAX_BALLS = 2;
 const DURIAN_SIZE = 90;
 const BALL_SIZE = 80;
-
 const GROUND_SPEED = [5, 7];
 const BALL_SPEED = [4, 7];
-let ballSpawnIndex = 0; // alternates ball images
+let ballSpawnIndex = 0;
 
-function rand(min, max) {
-  return Math.random() * (max - min) + min;
-}
-
+// --- Helper functions ---
+function rand(min, max) { return Math.random() * (max - min) + min; }
 function collide(a, b) {
   return (
     a.x < b.x + b.size &&
@@ -194,6 +203,7 @@ function resetGame() {
   player.blinkCount = 0;
   player.jumpsLeft = player.maxJumps;
   player.isJumping = false;
+  player.isJumpingByUser = false;
 
   durians.length = 0;
   BALLS.length = 0;
@@ -228,10 +238,6 @@ function update() {
   player.velocityX = Math.max(-MAX_SPEED, Math.min(MAX_SPEED, player.velocityX));
   player.x += player.velocityX;
 
-  // Keyboard fallback
-  if (keys["ArrowRight"]) player.velocityX += onGround ? MOVE_ACCEL : AIR_ACCEL;
-  if (keys["ArrowLeft"]) player.velocityX -= onGround ? MOVE_ACCEL : AIR_ACCEL;
-
   // Gravity
   player.velocityY += GRAVITY;
   player.y += player.velocityY;
@@ -241,6 +247,7 @@ function update() {
     player.y = groundY;
     player.velocityY = 0;
     player.jumpsLeft = player.maxJumps;
+    player.isJumpingByUser = false; // reset after landing
   }
 
   // Clamp horizontal
@@ -253,7 +260,6 @@ function update() {
   // --- Spawn durians and balls ---
   spawnTimer++;
   if (spawnTimer >= SPAWN_INTERVAL) {
-    // Durians
     if (durians.length < MAX_DURIANS) {
       const fromLeft = Math.random() < 0.5;
       durians.push({
@@ -265,7 +271,6 @@ function update() {
       });
     }
 
-    // Balls with alternating images
     if (BALLS.length < MAX_BALLS) {
       const fromLeft = Math.random() < 0.5;
       BALLS.push({
@@ -295,7 +300,6 @@ function update() {
       player.blinkTimer = 10;
       player.blinkCount = 6;
 
-      // Knockback player
       const dir = d.vx > 0 ? -1 : 1;
       player.velocityX = 10 * dir;
       player.velocityY = -8;
@@ -306,9 +310,7 @@ function update() {
       }
     }
 
-    if (d.x < cameraX - 400 || d.x > cameraX + canvas.width + 400) {
-      durians.splice(i, 1);
-    }
+    if (d.x < cameraX - 400 || d.x > cameraX + canvas.width + 400) durians.splice(i, 1);
   }
 
   // --- Update balls ---
@@ -331,9 +333,7 @@ function update() {
       player.health = Math.min(player.health + 1, 3);
     }
 
-    if (b.x < cameraX - 400 || b.x > cameraX + canvas.width + 400) {
-      BALLS.splice(i, 1);
-    }
+    if (b.x < cameraX - 400 || b.x > cameraX + canvas.width + 400) BALLS.splice(i, 1);
   }
 
   // Invincibility blinking
@@ -353,7 +353,7 @@ function draw() {
 
   ctx.drawImage(background, cameraX / bgScale, 0, canvas.width / bgScale, background.height, 0, 0, canvas.width, canvas.height);
 
-  // Draw durians
+  // Durians
   for (const d of durians) {
     ctx.save();
     ctx.translate(d.x - cameraX + d.size / 2, d.y + d.size / 2);
@@ -362,7 +362,7 @@ function draw() {
     ctx.restore();
   }
 
-  // Draw balls with rotation and alternating images
+  // Balls
   for (const b of BALLS) {
     const ballImg = ballImgs[b.imgIndex];
     ctx.save();
@@ -372,12 +372,22 @@ function draw() {
     ctx.restore();
   }
 
-  // Draw player
+  // Player
   const blink = player.invincible && player.blinkCount % 2 === 0;
-  const playerSprite = player.isJumping ? characterJump : (blink ? characterSilhouette : character);
-  ctx.drawImage(playerSprite, player.x - cameraX, player.y, player.width, player.height);
+  let playerSprite = character;
 
-  // Draw health bar
+  if (player.isJumpingByUser) {
+    // draw jump image in natural size
+    const ratio = characterJump.width / characterJump.height || 1;
+    const drawHeight = player.height;
+    const drawWidth = drawHeight * ratio;
+    ctx.drawImage(characterJump, player.x - cameraX, player.y, drawWidth, drawHeight);
+  } else {
+    playerSprite = blink ? characterSilhouette : character;
+    ctx.drawImage(playerSprite, player.x - cameraX, player.y, player.width, player.height);
+  }
+
+  // Health bar
   if (player.health > 0) ctx.drawImage(healthImgs[player.health - 1], 20, 20, 300, 80);
 
   // Game over
