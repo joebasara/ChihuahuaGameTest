@@ -72,7 +72,7 @@ document.addEventListener("keydown", e => {
 });
 document.addEventListener("keyup", e => keys[e.key] = false);
 
-// --- Mobile touch controls ---
+// --- Full-screen mobile touch controls ---
 const ongoingTouches = {};
 function getTouchPos(touch) {
   const rect = canvas.getBoundingClientRect();
@@ -93,38 +93,26 @@ canvas.addEventListener("touchstart", e => {
       return;
     }
 
-    if (pos.x < canvas.width / 2) {
-      if (pos.x < canvas.width / 4) {
-        keys["ArrowLeft"] = true;
-      } else {
-        keys["ArrowRight"] = true;
-      }
-    } else {
-      keys[" "] = true;
-    }
+    // Tap anywhere to jump
+    keys[" "] = true;
   }
 }, { passive: false });
 
 canvas.addEventListener("touchmove", e => {
   e.preventDefault();
-  let leftTouchActive = false;
+  keys["ArrowLeft"] = false;
+  keys["ArrowRight"] = false;
+
   for (let touch of e.touches) {
+    const prev = ongoingTouches[touch.identifier];
     const pos = getTouchPos(touch);
-    if (pos.x < canvas.width / 2) {
-      leftTouchActive = true;
-      if (pos.x < canvas.width / 4) {
-        keys["ArrowLeft"] = true;
-        keys["ArrowRight"] = false;
-      } else {
-        keys["ArrowRight"] = true;
-        keys["ArrowLeft"] = false;
-      }
-    }
+    if (!prev) continue;
+
+    const dx = pos.x - prev.x;
+    if (dx > 10) keys["ArrowRight"] = true;
+    else if (dx < -10) keys["ArrowLeft"] = true;
+
     ongoingTouches[touch.identifier] = pos;
-  }
-  if (!leftTouchActive) {
-    keys["ArrowLeft"] = false;
-    keys["ArrowRight"] = false;
   }
 }, { passive: false });
 
@@ -133,16 +121,8 @@ canvas.addEventListener("touchend", e => {
   for (let touch of e.changedTouches) {
     delete ongoingTouches[touch.identifier];
   }
-
-  let leftTouchExists = false;
-  for (let id in ongoingTouches) {
-    if (ongoingTouches[id].x < canvas.width / 2) leftTouchExists = true;
-  }
-  if (!leftTouchExists) {
-    keys["ArrowLeft"] = false;
-    keys["ArrowRight"] = false;
-  }
-
+  keys["ArrowLeft"] = false;
+  keys["ArrowRight"] = false;
   keys[" "] = false;
 });
 
@@ -245,7 +225,7 @@ function update() {
         x: cameraX + Math.random() * canvas.width,
         y: -DURIAN_SIZE,
         size: DURIAN_SIZE,
-        vy: rand(DROP_SPEED[0], DROP_SPEED[1]),
+        vy: rand(DROP_SPEED[0], DROP_SPEED[1]) * 0.5, // <-- half speed
         bounced: false,
         type: "drop"
       });
@@ -268,11 +248,11 @@ function update() {
     if (d.type === "ground") {
       d.x += d.vx;
     } else {
-      d.vy += GRAVITY;
+      d.vy += GRAVITY * 0.5; // <-- reduced gravity for slower fall
       d.y += d.vy;
       if (!d.bounced && d.y + d.size >= groundY + player.height) {
         d.y = groundY + player.height - d.size;
-        d.vy = -BOUNCE_FORCE;
+        d.vy = -BOUNCE_FORCE * 0.5; // slower bounce
         d.bounced = true;
       }
     }
