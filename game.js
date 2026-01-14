@@ -38,7 +38,7 @@ healthImgs[1].src = "health2.png";
 healthImgs[2].src = "health3.png";
 
 // --- Physics ---
-const GRAVITY = 0.6;
+const GRAVITY = 0.8;
 const JUMP_FORCE = 16;
 const MOVE_ACCEL = 0.6;
 const AIR_ACCEL = 0.4;
@@ -356,7 +356,7 @@ function draw() {
   const blink = player.invincible && player.blinkCount % 2 === 0;
 
   if (player.isJumpingByUser) {
-    const scale = 1.8; // 80% bigger
+    const scale = 2; // 100% bigger
     const ratio = characterJump.width / characterJump.height || 1;
     const drawHeight = player.height * scale;
     const drawWidth = drawHeight * ratio;
@@ -396,6 +396,7 @@ function loop() {
 }
 
 loop();
+
 
 
 
